@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Leave requests: only the owner can create/read their own
+    // Admins (HR) can read all — enforced via custom claims
+    match /leaveRequests/{docId} {
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null &&
+        (resource.data.staffEmail == request.auth.token.email ||
+         request.auth.token.role == "hr" ||
+         request.auth.token.role == "supervisor");
+      allow delete: if false;
+    }
+  }
+}

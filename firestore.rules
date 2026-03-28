@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /leaveRequests/{docId} {
+      // DEV MODE: open rules while Microsoft auth is pending
+      // Restore firestore.rules.production when Azure AD is live
+      allow read, write: if true;
+    }
+  }
+}
