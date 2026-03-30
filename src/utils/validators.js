@@ -5,18 +5,31 @@
  */
 export function validateLeaveForm(form) {
   const errors = {};
+  const today = new Date().toISOString().split("T")[0];
 
   if (!form.staffName?.trim()) errors.staffName = "Staff name is required";
   if (!form.department?.trim()) errors.department = "Department is required";
 
+  // Bug Fix 2 — only one leave type allowed
   if (!form.leaveTypes || form.leaveTypes.length === 0)
-    errors.leaveTypes = "Please select at least one leave type";
+    errors.leaveTypes = "Please select a leave type";
+  else if (form.leaveTypes.length > 1)
+    errors.leaveTypes = "Only one leave type can be selected per request";
 
-  if (!form.startDate) errors.startDate = "Start date is required";
-  if (!form.endDate) errors.endDate = "End date is required";
+  // Bug Fix 1 — dates cannot be in the past
+  if (!form.startDate) {
+    errors.startDate = "Start date is required";
+  } else if (form.startDate < today) {
+    errors.startDate = "Start date cannot be in the past";
+  }
 
-  if (form.startDate && form.endDate && form.endDate < form.startDate)
+  if (!form.endDate) {
+    errors.endDate = "End date is required";
+  } else if (form.endDate < today) {
+    errors.endDate = "End date cannot be in the past";
+  } else if (form.startDate && form.endDate < form.startDate) {
     errors.endDate = "End date must be on or after start date";
+  }
 
   if (!form.contactAddress?.trim())
     errors.contactAddress = "Contact address is required";
@@ -29,7 +42,6 @@ export function validateLeaveForm(form) {
   if (!form.relieverName?.trim()) errors.relieverName = "Reliever name is required";
   if (!form.supervisorName?.trim()) errors.supervisorName = "Supervisor name is required";
 
-  // Supervisor email — mandatory and must be @finopay.com
   if (!form.supervisorEmail?.trim())
     errors.supervisorEmail = "Supervisor email is required";
   else if (!/^[^\s@]+@finopay\.com$/i.test(form.supervisorEmail.trim()))

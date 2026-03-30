@@ -4,46 +4,50 @@ import { validateLeaveForm } from "../utils/validators";
 import { submitLeaveRequest } from "../services/leaveService";
 import { sendSupervisorEmail } from "../services/emailService";
 
+const today = new Date().toISOString().split("T")[0];
+
 const initialForm = {
-  staffName: "",
-  staffNumber: "",
-  department: "",
-  date: new Date().toISOString().split("T")[0],
-  dateOfEmployment: "",
+  staffName:          "",
+  staffNumber:        "",
+  department:         "",
+  date:               today,
+  dateOfEmployment:   "",
   confirmationStatus: "",
-  leaveTypes: [],
-  othersNote: "",
-  startDate: "",
-  endDate: "",
-  totalDays: "",
-  contactAddress: "",
-  mobileNumber: "",
-  alternativeEmail: "",
-  relieverName: "",
-  supervisorName: "",
-  supervisorEmail: "",
+  leaveTypes:         [],
+  othersNote:         "",
+  startDate:          "",
+  endDate:            "",
+  totalDays:          "",
+  contactAddress:     "",
+  mobileNumber:       "",
+  alternativeEmail:   "",
+  relieverName:       "",
+  supervisorName:     "",
+  supervisorEmail:    "",
+  // Leave allowance
+  requestAllowance:   false,
 };
 
 export function useLeaveForm(user) {
   const [form, setForm] = useState({
     ...initialForm,
-    staffName: user?.name || "",
+    staffName:  user?.name       || "",
     department: user?.department || "",
   });
 
-  const [errors, setErrors] = useState({});
-  const [status, setStatus] = useState("idle"); // idle | submitting | success | error
+  const [errors, setErrors]           = useState({});
+  const [status, setStatus]           = useState("idle");
   const [submitError, setSubmitError] = useState("");
 
   const setField = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const toggleLeaveType = (id) => {
+  // Bug Fix 2 — single select: clicking a selected type deselects it,
+  // clicking a new type replaces the previous selection
+  const selectLeaveType = (id) => {
     setForm((f) => ({
       ...f,
-      leaveTypes: f.leaveTypes.includes(id)
-        ? f.leaveTypes.filter((t) => t !== id)
-        : [...f.leaveTypes, id],
+      leaveTypes: f.leaveTypes.includes(id) ? [] : [id],
     }));
   };
 
@@ -52,16 +56,20 @@ export function useLeaveForm(user) {
       const updated = { ...prev, [key]: value };
       updated.totalDays = calculateLeaveDays(
         key === "startDate" ? value : prev.startDate,
-        key === "endDate" ? value : prev.endDate
+        key === "endDate"   ? value : prev.endDate
       );
       return updated;
     });
   };
 
+  const toggleAllowance = () => {
+    setForm((f) => ({ ...f, requestAllowance: !f.requestAllowance }));
+  };
+
   const reset = () => {
     setForm({
       ...initialForm,
-      staffName: user?.name || "",
+      staffName:  user?.name       || "",
       department: user?.department || "",
     });
     setErrors({});
@@ -81,10 +89,8 @@ export function useLeaveForm(user) {
     setSubmitError("");
 
     try {
-      // 1. Save to Firestore — this is the critical operation
       await submitLeaveRequest(form, user);
 
-      // 2. Send email — non-blocking, won't fail submission if EmailJS not configured yet
       sendSupervisorEmail(form, user).catch((err) =>
         console.warn("[EmailJS] Notification skipped — configure VITE_EMAILJS_* in .env to enable:", err?.text || err?.message || err)
       );
@@ -105,8 +111,9 @@ export function useLeaveForm(user) {
     status,
     submitError,
     setField,
-    toggleLeaveType,
+    selectLeaveType,   // renamed from toggleLeaveType
     handleDateChange,
+    toggleAllowance,
     submit,
     reset,
   };

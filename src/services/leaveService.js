@@ -8,33 +8,38 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
+  arrayUnion,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { HR_EMAIL } from "../auth/MsalConfig";
+import {
+  sendHrNotification,
+  sendSecondApproverNotification,
+  sendHrNotificationFromSecondApprover,
+} from "./emailService";
 
 const COLLECTION = "leaveRequests";
 
 /**
- * Submit a new leave request.
- * Initial status is always pending_supervisor — routed to the
- * supervisorEmail the staff specified in the form.
+ * Submit a new leave request
  */
 export async function submitLeaveRequest(formData, user) {
   const docRef = await addDoc(collection(db, COLLECTION), {
     ...formData,
-    staffEmail:  user.email,
-    staffName:   user.name,
-    status:      "pending_supervisor",
+    staffEmail:           user.email,
+    staffName:            user.name,
+    status:               "pending_supervisor",
     currentApproverEmail: formData.supervisorEmail,
-    approvalChain: [],          // will be populated as approvals happen
-    submittedAt:  serverTimestamp(),
-    updatedAt:    serverTimestamp(),
+    approvalChain:        [],
+    submittedAt:          serverTimestamp(),
+    updatedAt:            serverTimestamp(),
   });
   return docRef.id;
 }
 
 /**
- * Get all leave requests for a specific staff member.
+ * Get all leave requests for a specific staff member
  */
 export async function getLeavesByUser(staffEmail) {
   const q = query(
@@ -47,8 +52,7 @@ export async function getLeavesByUser(staffEmail) {
 }
 
 /**
- * Get requests currently assigned to a specific approver email.
- * Used by both approver and HR views.
+ * Get requests currently assigned to a specific approver email
  */
 export async function getLeavesByApprover(approverEmail) {
   const q = query(
@@ -62,7 +66,7 @@ export async function getLeavesByApprover(approverEmail) {
 }
 
 /**
- * Get ALL leave requests — for admin/reporting use.
+ * Get ALL leave requests — admin use
  */
 export async function getAllLeaves() {
   const q = query(
@@ -74,19 +78,7 @@ export async function getAllLeaves() {
 }
 
 /**
- * Process an approval decision.
- *
- * For approvers (non-HR):
- *   - requiresFurtherApproval=true  → status becomes pending_second_approver,
- *                                     currentApproverEmail = secondApproverEmail
- *   - requiresFurtherApproval=false → status becomes pending_hr,
- *                                     currentApproverEmail = HR_EMAIL
- *
- * For HR:
- *   - approved=true  → status becomes "approved"
- *   - approved=false → status becomes "rejected"
- *
- * Rejection at any stage → status becomes "rejected" immediately.
+ * Process an approval decision and send the appropriate email notification
  */
 export async function updateApproval(docId, decision) {
   const {
@@ -94,26 +86,29 @@ export async function updateApproval(docId, decision) {
     by,
     byEmail,
     comment,
-    stage,                  // "supervisor" | "second_approver" | "hr"
+    stage,
     requiresFurtherApproval,
     secondApproverEmail,
     resumptionDate,
     adjustedDays,
   } = decision;
 
+  // Fetch the leave document to get form data for emails
   const ref = doc(db, COLLECTION, docId);
+  const snap = await getDoc(ref);
+  const leave = { id: docId, ...snap.data() };
 
-  // Build the chain entry for this approval
+  // Build chain entry
   const chainEntry = {
     stage,
     approved,
     by,
     byEmail,
     comment: comment || "",
-    at: new Date().toISOString(), // client timestamp for chain readability
+    at: new Date().toISOString(),
   };
 
-  // Determine next status and next approver
+  // Determine next status and approver
   let nextStatus;
   let nextApproverEmail;
 
@@ -131,23 +126,46 @@ export async function updateApproval(docId, decision) {
     nextApproverEmail = HR_EMAIL;
   }
 
+  // Build Firestore payload
   const payload = {
     status:               nextStatus,
     currentApproverEmail: nextApproverEmail,
-    approvalChain:        [], // will use arrayUnion below
     updatedAt:            serverTimestamp(),
   };
 
-  // HR fields
+  // HR fields saved on final approval
   if (stage === "hr" && approved) {
     if (resumptionDate) payload.resumptionDate = resumptionDate;
     if (adjustedDays)   payload.adjustedDays   = adjustedDays;
   }
 
-  // Use arrayUnion to safely append to the chain
-  const { arrayUnion } = await import("firebase/firestore");
+  // Write to Firestore
   await updateDoc(ref, {
     ...payload,
     approvalChain: arrayUnion(chainEntry),
   });
+
+  // ── Send email notifications (non-blocking) ────────────────────────────
+  if (approved) {
+    if (stage === "hr") {
+      // HR final approval — Template B (staff notification) comes later
+      // For now just log — will be wired when Template B is set up
+      console.info("[Email] HR approved — staff notification pending Template B setup");
+    } else if (requiresFurtherApproval && secondApproverEmail) {
+      // Forward to second approver
+      sendSecondApproverNotification(leave, by, secondApproverEmail)
+        .catch(err => console.warn("[EmailJS] 2nd approver notification failed:", err?.text || err));
+    } else if (stage === "second_approver") {
+      // Second approver approved — notify HR
+      sendHrNotificationFromSecondApprover(leave, by)
+        .catch(err => console.warn("[EmailJS] HR notification failed:", err?.text || err));
+    } else {
+      // First approver approved, no forward — notify HR
+      sendHrNotification(leave, by)
+        .catch(err => console.warn("[EmailJS] HR notification failed:", err?.text || err));
+    }
+  } else {
+    // Rejected at any stage — Template B (staff notification) comes later
+    console.info("[Email] Rejected — staff notification pending Template B setup");
+  }
 }

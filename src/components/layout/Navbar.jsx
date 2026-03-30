@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
+import logo from "../../assets/finopay.png";
 
 const ROLE_LABELS = {
   initiator: null,
@@ -46,25 +47,7 @@ export default function Navbar() {
         style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
         onClick={() => navigate("/dashboard")}
       >
-        <div style={{
-          width: 36, height: 36, borderRadius: 9,
-          background: "linear-gradient(135deg, #c0392b, #e74c3c)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 3px 10px rgba(192,57,43,0.3)",
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="white" opacity="0.9"/>
-            <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 800, color: "#1e293b", fontFamily: "'DM Sans', sans-serif", lineHeight: 1 }}>
-            Fino<span style={{ color: "#c0392b" }}>pay</span>
-          </div>
-          <div style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "'DM Sans', sans-serif" }}>
-            HR Portal
-          </div>
-        </div>
+       <img src={logo} alt="Finopay Logo" style={{ height: 40, objectFit: "contain" }} />
       </div>
 
       {/* Nav Links */}
