@@ -1,15 +1,7 @@
 import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  doc,
-  updateDoc,
-  arrayUnion,
-  getDoc,
+  collection, addDoc, getDocs, query, where,
+  orderBy, serverTimestamp, doc, updateDoc,
+  arrayUnion, getDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { HR_EMAIL } from "../auth/MsalConfig";
@@ -17,13 +9,30 @@ import {
   sendHrNotification,
   sendSecondApproverNotification,
   sendHrNotificationFromSecondApprover,
+  sendStaffApprovedEmail,
+  sendStaffRejectedEmail,
+  sendMdAllowanceRequest,
+  sendHrAllowanceDecision,
 } from "./emailService";
 
 const COLLECTION = "leaveRequests";
 
-/**
- * Submit a new leave request
- */
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function generateToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function tokenExpiry() {
+  const d = new Date();
+  d.setHours(d.getHours() + 72);
+  return d.toISOString();
+}
+
+// ── Core CRUD ─────────────────────────────────────────────────────────────────
+
 export async function submitLeaveRequest(formData, user) {
   const docRef = await addDoc(collection(db, COLLECTION), {
     ...formData,
@@ -32,15 +41,15 @@ export async function submitLeaveRequest(formData, user) {
     status:               "pending_supervisor",
     currentApproverEmail: formData.supervisorEmail,
     approvalChain:        [],
+    // Allowance fields
+    allowanceRequested:   formData.requestAllowance || false,
+    allowanceStatus:      null,
     submittedAt:          serverTimestamp(),
     updatedAt:            serverTimestamp(),
   });
   return docRef.id;
 }
 
-/**
- * Get all leave requests for a specific staff member
- */
 export async function getLeavesByUser(staffEmail) {
   const q = query(
     collection(db, COLLECTION),
@@ -51,9 +60,6 @@ export async function getLeavesByUser(staffEmail) {
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Get requests currently assigned to a specific approver email
- */
 export async function getLeavesByApprover(approverEmail) {
   const q = query(
     collection(db, COLLECTION),
@@ -65,50 +71,45 @@ export async function getLeavesByApprover(approverEmail) {
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Get ALL leave requests — admin use
- */
 export async function getAllLeaves() {
-  const q = query(
-    collection(db, COLLECTION),
-    orderBy("submittedAt", "desc")
-  );
+  const q = query(collection(db, COLLECTION), orderBy("submittedAt", "desc"));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Process an approval decision and send the appropriate email notification
- */
+// ── Get leave by allowance token (used by public MD review page) ──────────────
+
+export async function getLeaveByAllowanceToken(token) {
+  const q = query(
+    collection(db, COLLECTION),
+    where("allowanceToken", "==", token)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const d = snapshot.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
+// ── Main approval handler ─────────────────────────────────────────────────────
+
 export async function updateApproval(docId, decision) {
   const {
-    approved,
-    by,
-    byEmail,
-    comment,
-    stage,
-    requiresFurtherApproval,
-    secondApproverEmail,
-    resumptionDate,
-    adjustedDays,
+    approved, by, byEmail, comment, stage,
+    requiresFurtherApproval, secondApproverEmail,
+    resumptionDate, adjustedDays,
   } = decision;
 
-  // Fetch the leave document to get form data for emails
-  const ref = doc(db, COLLECTION, docId);
+  const ref  = doc(db, COLLECTION, docId);
   const snap = await getDoc(ref);
   const leave = { id: docId, ...snap.data() };
 
-  // Build chain entry
   const chainEntry = {
-    stage,
-    approved,
-    by,
-    byEmail,
+    stage, approved, by, byEmail,
     comment: comment || "",
     at: new Date().toISOString(),
   };
 
-  // Determine next status and approver
+  // Determine next status
   let nextStatus;
   let nextApproverEmail;
 
@@ -116,7 +117,9 @@ export async function updateApproval(docId, decision) {
     nextStatus = "rejected";
     nextApproverEmail = null;
   } else if (stage === "hr") {
-    nextStatus = "approved";
+    // If allowance was requested → generate tokens and notify MD
+    // Otherwise → fully approved
+    nextStatus = leave.allowanceRequested ? "approved_pending_allowance" : "approved";
     nextApproverEmail = null;
   } else if (requiresFurtherApproval && secondApproverEmail) {
     nextStatus = "pending_second_approver";
@@ -126,46 +129,95 @@ export async function updateApproval(docId, decision) {
     nextApproverEmail = HR_EMAIL;
   }
 
-  // Build Firestore payload
   const payload = {
     status:               nextStatus,
     currentApproverEmail: nextApproverEmail,
     updatedAt:            serverTimestamp(),
   };
 
-  // HR fields saved on final approval
   if (stage === "hr" && approved) {
     if (resumptionDate) payload.resumptionDate = resumptionDate;
     if (adjustedDays)   payload.adjustedDays   = adjustedDays;
   }
 
-  // Write to Firestore
+  // Generate allowance tokens if needed
+  let approveToken, rejectToken;
+  if (stage === "hr" && approved && leave.allowanceRequested) {
+    approveToken = generateToken();
+    rejectToken  = generateToken();
+    payload.allowanceToken       = approveToken;   // approve token
+    payload.allowanceRejectToken = rejectToken;    // reject token
+    payload.allowanceTokenExpiry = tokenExpiry();
+    payload.allowanceStatus      = "pending_md";
+  }
+
   await updateDoc(ref, {
     ...payload,
     approvalChain: arrayUnion(chainEntry),
   });
 
-  // ── Send email notifications (non-blocking) ────────────────────────────
+  // Build updated leave object for email functions
+  const updatedLeave = { ...leave, ...payload, approvalChain: [...(leave.approvalChain || []), chainEntry] };
+
+  // ── Email notifications ────────────────────────────────────────────────────
   if (approved) {
     if (stage === "hr") {
-      // HR final approval — Template B (staff notification) comes later
-      // For now just log — will be wired when Template B is set up
-      console.info("[Email] HR approved — staff notification pending Template B setup");
+      // Notify staff — leave approved
+      sendStaffApprovedEmail(updatedLeave)
+        .catch(err => console.warn("[EmailJS] Staff approved email failed:", err?.text || err));
+
+      // If allowance requested — notify MD with token links
+      if (leave.allowanceRequested) {
+        sendMdAllowanceRequest(updatedLeave, approveToken, rejectToken)
+          .catch(err => console.warn("[EmailJS] MD allowance email failed:", err?.text || err));
+      }
     } else if (requiresFurtherApproval && secondApproverEmail) {
-      // Forward to second approver
       sendSecondApproverNotification(leave, by, secondApproverEmail)
         .catch(err => console.warn("[EmailJS] 2nd approver notification failed:", err?.text || err));
     } else if (stage === "second_approver") {
-      // Second approver approved — notify HR
       sendHrNotificationFromSecondApprover(leave, by)
         .catch(err => console.warn("[EmailJS] HR notification failed:", err?.text || err));
     } else {
-      // First approver approved, no forward — notify HR
       sendHrNotification(leave, by)
         .catch(err => console.warn("[EmailJS] HR notification failed:", err?.text || err));
     }
   } else {
-    // Rejected at any stage — Template B (staff notification) comes later
-    console.info("[Email] Rejected — staff notification pending Template B setup");
+    // Rejected at any stage — notify staff
+    sendStaffRejectedEmail(leave)
+      .catch(err => console.warn("[EmailJS] Staff rejected email failed:", err?.text || err));
   }
+}
+
+// ── MD Allowance Decision (called from public review page) ───────────────────
+
+export async function processMdAllowanceDecision(token, approved) {
+  // Find the leave by token
+  const leave = await getLeaveByAllowanceToken(token);
+
+  if (!leave) throw new Error("Invalid or expired token.");
+
+  // Check token expiry
+  if (leave.allowanceTokenExpiry && new Date() > new Date(leave.allowanceTokenExpiry)) {
+    throw new Error("This approval link has expired.");
+  }
+
+  // Check token hasn't already been used
+  if (leave.allowanceStatus !== "pending_md") {
+    throw new Error("This request has already been actioned.");
+  }
+
+  const ref = doc(db, COLLECTION, leave.id);
+  await updateDoc(ref, {
+    allowanceStatus:      approved ? "approved" : "rejected",
+    allowanceToken:       null,   // invalidate token after use
+    allowanceRejectToken: null,
+    allowanceDecidedAt:   serverTimestamp(),
+    updatedAt:            serverTimestamp(),
+  });
+
+  // Notify HR of MD's decision
+  sendHrAllowanceDecision(leave, approved)
+    .catch(err => console.warn("[EmailJS] HR allowance decision email failed:", err?.text || err));
+
+  return { approved, staffName: leave.staffName };
 }

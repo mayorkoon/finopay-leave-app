@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import LeaveRequestPage from "./pages/LeaveRequestPage";
 import ApprovalPage from "./pages/ApprovalPage";
+import AllowanceReviewPage from "./pages/AllowanceReviewPage";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 
 function AuthenticatedRoutes() {
@@ -16,6 +17,8 @@ function AuthenticatedRoutes() {
 
   return (
     <Routes>
+      {/* Public route — no auth needed for MD allowance review */}
+      <Route path="/allowance/review" element={<AllowanceReviewPage />} />
       {/* HR lands on /approvals, everyone else lands on /dashboard */}
       <Route
         path="/"
@@ -52,6 +55,8 @@ function AuthenticatedRoutes() {
 function UnauthenticatedRoutes() {
   return (
     <Routes>
+      {/* Public route — MD can review allowance without logging in */}
+      <Route path="/allowance/review" element={<AllowanceReviewPage />} />
       <Route path="*" element={<LoginPage />} />
     </Routes>
   );
