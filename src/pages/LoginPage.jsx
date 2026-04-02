@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest, USE_MOCK_AUTH, HR_EMAIL } from "../auth/MsalConfig";
 import { useAuth } from "../auth/AuthProvider";
+import logo from "../assets/finopay.png";
 
 const ROLES = [
   { value: "initiator", label: "Initiator — submit leave requests" },
@@ -63,24 +64,9 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 32 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: 14,
-            background: "linear-gradient(135deg, #c0392b, #e74c3c)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 6px 20px rgba(192,57,43,0.4)",
-          }}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="white" opacity="0.9"/>
-              <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
+        <img src={logo} alt="Finopay Logo" style={{ height: 52, objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#1e293b", lineHeight: 1 }}>
-              Fino<span style={{ color: "#c0392b" }}>pay</span>
-            </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              HR Portal
-            </div>
+            
           </div>
         </div>
 
@@ -105,7 +91,7 @@ export default function LoginPage() {
                   type="text"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Abiodun Oyewale"
+                  placeholder="e.g. John Doe"
                   style={inputStyle}
                   onFocus={e => e.target.style.borderColor = "#c0392b"}
                   onBlur={e => e.target.style.borderColor = "#e2e8f0"}
