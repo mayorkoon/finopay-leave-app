@@ -70,7 +70,7 @@ function MsalAuthInner({ useMsal, useIsAuthenticated, children }) {
 
   useEffect(() => {
     if (msalAuthenticated && accounts.length > 0) {
-      const account = accounts[0];
+      const account = instance.getActiveAccount() || accounts[0];
       setUser({
         name: account.name,
         email: account.username,
@@ -86,8 +86,15 @@ function MsalAuthInner({ useMsal, useIsAuthenticated, children }) {
   const login = () =>
     instance.loginRedirect({ scopes: ["User.Read", "openid", "profile", "email"] });
 
-  const logout = () =>
-    instance.logoutRedirect({ postLogoutRedirectUri: window.location.origin });
+  const logout = () => {
+    // Clear local MSAL tokens only — does NOT redirect to Microsoft's logout page.
+    // This keeps the user's Microsoft SSO session intact and just signs them
+    // out of the app, returning them to the login page.
+    instance.logoutRedirect({
+      onRedirectNavigate: () => false,
+    });
+    window.location.replace("/");
+  };
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: msalAuthenticated, login, logout }}>

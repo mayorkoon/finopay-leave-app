@@ -14,13 +14,13 @@ export default function DashboardPage() {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Get leave balance — uses confirmationStatus and grade from latest leave request
-  // In production these will come from Azure AD / SharePoint user profile
+  // Get leave balance — reads band + confirmationStatus saved on the latest leave record
+  // grade → band mapping happens in useLeaveForm before submission; raw grade is never stored
   const latestLeave = leaves[0];
   const { balance, entitlement, used, loading: balanceLoading } = useLeaveBalance(
     user,
-    latestLeave?.confirmationStatus || "",
-    latestLeave?.grade || ""
+    latestLeave?.band               || "",
+    latestLeave?.confirmationStatus || ""
   );
 
   useEffect(() => {

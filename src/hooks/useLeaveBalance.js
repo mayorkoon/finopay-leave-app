@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
 import { getLeavesByUser } from "../services/leaveService";
-import { getEntitlement, TRACKABLE_LEAVE_TYPES } from "../constants/leaveEntitlements";
+import { TRACKABLE_LEAVE_TYPES, BAND_ENTITLEMENTS } from "../constants/leaveEntitlements";
 
 /**
  * Calculate leave balance for the logged-in staff member.
  *
- * Rules:
- * - Only fully HR-approved leaves count (status === "approved" or "approved_pending_allowance")
- * - Only leaves taken in the current calendar year count
- * - Resets January 1st every year
- * - Tracks Annual, Sick, and Casual leave only
+ * Privacy model:
+ * - Raw grade is never stored in Firestore
+ * - Grade → Band mapping happens in the browser only (in useLeaveForm)
+ * - Only the band is saved to Firestore
+ * - This hook receives the band directly from the leave record
+ *
+ * @param {object} user           - authenticated user
+ * @param {string} band           - e.g. "Band 1" (read from Firestore leave record)
+ * @param {string} employmentType - Confirmed | Contract | Not Confirmed
  */
-export function useLeaveBalance(user, confirmationStatus, grade) {
-  const [balance, setBalance]       = useState(null);
+export function useLeaveBalance(user, band, employmentType) {
+  const [balance, setBalance]         = useState(null);
   const [entitlement, setEntitlement] = useState(null);
-  const [used, setUsed]             = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  const [used, setUsed]               = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
 
   useEffect(() => {
     if (!user?.email) return;
@@ -25,10 +29,13 @@ export function useLeaveBalance(user, confirmationStatus, grade) {
 
     getLeavesByUser(user.email)
       .then((leaves) => {
-        // Filter: approved this calendar year only
+        // Only count HR-approved leaves from current year
         const approvedThisYear = leaves.filter((l) => {
-          const isApproved = l.status === "approved" || l.status === "approved_pending_allowance";
-          const leaveYear  = l.startDate ? new Date(l.startDate).getFullYear() : null;
+          const isApproved = l.status === "approved" ||
+                             l.status === "approved_pending_allowance";
+          const leaveYear  = l.startDate
+            ? new Date(l.startDate).getFullYear()
+            : null;
           return isApproved && leaveYear === currentYear;
         });
 
@@ -45,8 +52,10 @@ export function useLeaveBalance(user, confirmationStatus, grade) {
           }
         });
 
-        // Get entitlement based on confirmation status and grade
-        const ent = getEntitlement(confirmationStatus, grade);
+        // Look up entitlement directly by band + employment type
+        const ent = band && employmentType
+          ? BAND_ENTITLEMENTS[band]?.[employmentType] || null
+          : null;
 
         setUsed(usedDays);
         setEntitlement(ent);
@@ -64,7 +73,7 @@ export function useLeaveBalance(user, confirmationStatus, grade) {
         setError("Could not load leave balance.");
       })
       .finally(() => setLoading(false));
-  }, [user, confirmationStatus, grade]);
+  }, [user, band, employmentType]);
 
   return { balance, entitlement, used, loading, error };
 }

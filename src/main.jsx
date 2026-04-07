@@ -13,11 +13,29 @@ const tree = (
   </React.StrictMode>
 );
 
-// Only wrap with MsalProvider when using real Microsoft auth.
-// In mock mode, MsalProvider is skipped entirely to avoid
-// MSAL initialization errors from missing Azure AD credentials.
-ReactDOM.createRoot(document.getElementById("root")).render(
-  USE_MOCK_AUTH
-    ? tree
-    : <MsalProvider instance={msalInstance}>{tree}</MsalProvider>
-);
+if (USE_MOCK_AUTH) {
+  ReactDOM.createRoot(document.getElementById("root")).render(tree);
+} else {
+  // Initialize MSAL before rendering and pin the active account from the
+  // redirect result. This ensures getActiveAccount() is always reliable.
+  msalInstance.initialize().then(async () => {
+    try {
+      const result = await msalInstance.handleRedirectPromise();
+      if (result?.account) {
+        msalInstance.setActiveAccount(result.account);
+      } else {
+        const cached = msalInstance.getAllAccounts();
+        if (cached.length === 1) {
+          msalInstance.setActiveAccount(cached[0]);
+        }
+        // Multiple cached accounts with no active one: leave MSAL to resolve
+        // naturally — do NOT clear cache as that would log users out unexpectedly.
+      }
+    } catch (e) {
+      console.error("[MSAL] Redirect handling error:", e);
+    }
+    ReactDOM.createRoot(document.getElementById("root")).render(
+      <MsalProvider instance={msalInstance}>{tree}</MsalProvider>
+    );
+  });
+}

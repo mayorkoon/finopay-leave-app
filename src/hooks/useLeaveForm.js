@@ -3,6 +3,7 @@ import { calculateLeaveDays } from "../utils/calculateLeaveDays";
 import { validateLeaveForm } from "../utils/validators";
 import { submitLeaveRequest } from "../services/leaveService";
 import { sendSupervisorEmail } from "../services/emailService";
+import { getBandForGrade } from "../constants/leaveEntitlements";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -90,7 +91,11 @@ export function useLeaveForm(user) {
     setSubmitError("");
 
     try {
-      await submitLeaveRequest(form, user);
+      const formToSave = {
+        ...form,
+        band: getBandForGrade(form.grade) || null,
+      };
+      await submitLeaveRequest(formToSave, user);
 
       sendSupervisorEmail(form, user).catch((err) =>
         console.warn("[EmailJS] Notification skipped — configure VITE_EMAILJS_* in .env to enable:", err?.text || err?.message || err)
