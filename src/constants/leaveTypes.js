@@ -35,7 +35,7 @@ export const LEAVE_STATUS = {
     bg:    "#ecfdf5",
   },
   approved_pending_allowance: {
-    label: "Approved — Allowance Pending",
+    label: "Approved — Allowance Under Review",
     color: "#f59e0b",
     bg:    "#fffbeb",
   },

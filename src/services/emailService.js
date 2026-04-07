@@ -96,18 +96,17 @@ export async function sendStaffRejectedEmail(leave) {
 
 // ── MD Allowance notifications ────────────────────────────────────────────────
 
-export async function sendMdAllowanceRequest(leave, approveToken, rejectToken) {
-  const baseUrl = window.location.origin;
-  const approveUrl = `${baseUrl}/allowance/review?token=${approveToken}&action=approve`;
-  const rejectUrl  = `${baseUrl}/allowance/review?token=${rejectToken}&action=reject`;
+export async function sendMdAllowanceRequest(leave, approveToken) {
+  const baseUrl    = window.location.origin;
+  const reviewUrl  = `${baseUrl}/allowance/review?token=${approveToken}`;
 
   return send(TEMPLATE_OUTCOME, {
     ...leaveParams(leave),
     recipient_email: MD_EMAIL,
     recipient_name:  "MD",
     email_subject:   `Leave Allowance Approval Required — ${leave.staffName}`,
-    intro_message:   `${leave.staffName} from ${leave.department} has been approved for leave and is requesting a leave allowance. Your approval is required.`,
-    action_section:  `To approve this allowance request, click the link below:\n${approveUrl}\n\nTo reject this allowance request, click the link below:\n${rejectUrl}\n\nNote: These links expire in 72 hours. The staff member's leave is already approved regardless of your decision on the allowance.`,
+    intro_message:   `${leave.staffName} from ${leave.department} has been approved for leave and is requesting a leave allowance. Your review is required.`,
+    action_section:  `Please click the link below to review and action this request:\n${reviewUrl}\n\nNote: This link expires in 72 hours. The staff member's leave is already approved regardless of your decision on the allowance.`,
   });
 }
 

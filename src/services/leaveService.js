@@ -80,6 +80,7 @@ export async function getAllLeaves() {
 // ── Get leave by allowance token (used by public MD review page) ──────────────
 
 export async function getLeaveByAllowanceToken(token) {
+  // Search by the single review token
   const q = query(
     collection(db, COLLECTION),
     where("allowanceToken", "==", token)
@@ -140,13 +141,11 @@ export async function updateApproval(docId, decision) {
     if (adjustedDays)   payload.adjustedDays   = adjustedDays;
   }
 
-  // Generate allowance tokens if needed
-  let approveToken, rejectToken;
+  // Generate allowance token if needed — single token for review page
+  let approveToken;
   if (stage === "hr" && approved && leave.allowanceRequested) {
     approveToken = generateToken();
-    rejectToken  = generateToken();
-    payload.allowanceToken       = approveToken;   // approve token
-    payload.allowanceRejectToken = rejectToken;    // reject token
+    payload.allowanceToken       = approveToken;
     payload.allowanceTokenExpiry = tokenExpiry();
     payload.allowanceStatus      = "pending_md";
   }
@@ -168,7 +167,7 @@ export async function updateApproval(docId, decision) {
 
       // If allowance requested — notify MD with token links
       if (leave.allowanceRequested) {
-        sendMdAllowanceRequest(updatedLeave, approveToken, rejectToken)
+        sendMdAllowanceRequest(updatedLeave, approveToken)
           .catch(err => console.warn("[EmailJS] MD allowance email failed:", err?.text || err));
       }
     } else if (requiresFurtherApproval && secondApproverEmail) {
@@ -208,11 +207,13 @@ export async function processMdAllowanceDecision(token, approved) {
 
   const ref = doc(db, COLLECTION, leave.id);
   await updateDoc(ref, {
-    allowanceStatus:      approved ? "approved" : "rejected",
-    allowanceToken:       null,   // invalidate token after use
-    allowanceRejectToken: null,
-    allowanceDecidedAt:   serverTimestamp(),
-    updatedAt:            serverTimestamp(),
+    // Fix Bug 2 — update main status to "approved" once MD decides
+    // regardless of allowance outcome, leave is always fully approved
+    status:           "approved",
+    allowanceStatus:  approved ? "approved" : "rejected",
+    allowanceToken:   null,   // invalidate token after use
+    allowanceDecidedAt: serverTimestamp(),
+    updatedAt:        serverTimestamp(),
   });
 
   // Notify HR of MD's decision

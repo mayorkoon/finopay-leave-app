@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { getLeavesByUser } from "../services/leaveService";
 import { formatDate } from "../utils/calculateLeaveDays";
 import { LEAVE_TYPES } from "../constants/leaveTypes";
+import { useLeaveBalance } from "../hooks/useLeaveBalance";
 import Navbar from "../components/layout/Navbar";
 import StatusBadge from "../components/ui/StatusBadge";
 
@@ -12,6 +13,15 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Get leave balance — uses confirmationStatus and grade from latest leave request
+  // In production these will come from Azure AD / SharePoint user profile
+  const latestLeave = leaves[0];
+  const { balance, entitlement, used, loading: balanceLoading } = useLeaveBalance(
+    user,
+    latestLeave?.confirmationStatus || "",
+    latestLeave?.grade || ""
+  );
 
   useEffect(() => {
     if (!user?.email) return;
@@ -59,6 +69,70 @@ export default function DashboardPage() {
             Track and manage your leave requests below.
           </p>
         </div>
+
+        {/* ── Leave Balance Cards ── */}
+        {balance && (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
+              Leave Balance — {new Date().getFullYear()}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {[
+                { label: "Annual Leave",  key: "annual",  color: "#3b82f6", bg: "#eff6ff", icon: "🏖️" },
+                { label: "Sick Leave",    key: "sick",    color: "#10b981", bg: "#ecfdf5", icon: "🏥" },
+                { label: "Casual Leave",  key: "casual",  color: "#8b5cf6", bg: "#f5f3ff", icon: "☀️" },
+              ].map(({ label, key, color, bg, icon }) => {
+                const remaining  = balance[key] ?? 0;
+                const total      = entitlement?.[key] ?? 0;
+                const usedDays   = used?.[key] ?? 0;
+                const pct        = total > 0 ? Math.round((remaining / total) * 100) : 0;
+                return (
+                  <div key={key} style={{
+                    background: "#fff", borderRadius: 16, padding: "20px 24px",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+                    border: `1px solid ${bg}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "'DM Sans', sans-serif" }}>
+                          {label}
+                        </div>
+                        <div style={{ fontSize: 28, fontWeight: 800, color, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.2 }}>
+                          {remaining}
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#94a3b8" }}> / {total} days</span>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 28 }}>{icon}</span>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden", marginBottom: 8 }}>
+                      <div style={{
+                        height: "100%", borderRadius: 4,
+                        background: color,
+                        width: `${pct}%`,
+                        transition: "width 0.5s ease",
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "'DM Sans', sans-serif" }}>
+                      {usedDays} day{usedDays !== 1 ? "s" : ""} used · {remaining} remaining
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── No balance info message ── */}
+        {!balance && !balanceLoading && leaves.length > 0 && (
+          <div style={{
+            background: "#fffbeb", border: "1px solid #fde68a",
+            borderRadius: 12, padding: "12px 20px", marginBottom: 24,
+            fontSize: 13, color: "#92400e", fontFamily: "'DM Sans', sans-serif",
+          }}>
+            ℹ️ Leave balance unavailable — please ensure your <strong>Confirmation Status</strong> and <strong>Grade</strong> are filled in on your next leave request.
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div

@@ -24,6 +24,7 @@ const initialForm = {
   relieverName:       "",
   supervisorName:     "",
   supervisorEmail:    "",
+  grade:              "",
   // Leave allowance
   requestAllowance:   false,
 };

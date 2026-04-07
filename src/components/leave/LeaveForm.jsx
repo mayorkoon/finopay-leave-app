@@ -1,6 +1,8 @@
 import { useAuth } from "../../auth/AuthProvider";
 import { useLeaveForm } from "../../hooks/useLeaveForm";
+import { useLeaveBalance } from "../../hooks/useLeaveBalance";
 import { LEAVE_TYPES } from "../../constants/leaveTypes";
+import { GRADES, TRACKABLE_LEAVE_TYPES } from "../../constants/leaveEntitlements";
 import InputField from "../ui/InputField";
 import SectionHeader from "../ui/SectionHeader";
 import LeaveSuccess from "./LeaveSuccess";
@@ -47,17 +49,19 @@ function SelectInput({ value, onChange, children, hasError }) {
 }
 
 // ── Leave Type Radio Button ──────────────────────────────────────────────────
-function LeaveTypeOption({ label, selected, onChange }) {
+function LeaveTypeOption({ label, selected, onChange, exhausted }) {
+  const disabled = exhausted && !selected;
   return (
     <label style={{
       display: "flex", alignItems: "center", gap: 10,
-      cursor: "pointer", padding: "10px 14px", borderRadius: 8,
-      border: `1.5px solid ${selected ? "#c0392b" : "#e2e8f0"}`,
-      background: selected ? "#fff1f2" : "#fff",
+      cursor: disabled ? "not-allowed" : "pointer",
+      padding: "10px 14px", borderRadius: 8,
+      border: `1.5px solid ${exhausted ? "#e2e8f0" : selected ? "#c0392b" : "#e2e8f0"}`,
+      background: exhausted ? "#f8fafc" : selected ? "#fff1f2" : "#fff",
       transition: "all 0.2s", userSelect: "none",
       fontFamily: "'DM Sans', sans-serif",
+      opacity: exhausted ? 0.6 : 1,
     }}>
-      {/* Custom radio circle */}
       <div style={{
         width: 18, height: 18, borderRadius: "50%",
         border: `2px solid ${selected ? "#c0392b" : "#cbd5e1"}`,
@@ -69,13 +73,21 @@ function LeaveTypeOption({ label, selected, onChange }) {
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />
         )}
       </div>
-      <span style={{
-        fontSize: 14, fontWeight: selected ? 600 : 400,
-        color: selected ? "#c0392b" : "#1e293b",
-      }}>
-        {label}
-      </span>
-      <input type="radio" checked={selected} onChange={onChange} style={{ display: "none" }} />
+      <div style={{ flex: 1 }}>
+        <span style={{
+          fontSize: 14, fontWeight: selected ? 600 : 400,
+          color: exhausted ? "#94a3b8" : selected ? "#c0392b" : "#1e293b",
+          display: "block",
+        }}>
+          {label}
+        </span>
+        {exhausted && (
+          <span style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>
+            Balance exhausted
+          </span>
+        )}
+      </div>
+      <input type="radio" checked={selected} disabled={disabled} onChange={disabled ? undefined : onChange} style={{ display: "none" }} />
     </label>
   );
 }
@@ -130,6 +142,16 @@ export default function LeaveForm() {
     toggleAllowance, submit, reset,
   } = useLeaveForm(user);
 
+  const { balance } = useLeaveBalance(user, form.confirmationStatus, form.grade);
+
+  // Returns true if a leave type's balance is known and exhausted
+  const isExhausted = (leaveTypeId) => {
+    if (!balance) return false;
+    const trackable = TRACKABLE_LEAVE_TYPES[leaveTypeId];
+    if (!trackable) return false;
+    return balance[trackable.key] <= 0;
+  };
+
   if (status === "success") {
     return <LeaveSuccess form={form} onReset={reset} />;
   }
@@ -180,15 +202,26 @@ export default function LeaveForm() {
             <InputField label="Staff Number" value={form.staffNumber} onChange={setField("staffNumber")} />
             <InputField label="Department / Unit" value={form.department} onChange={setField("department")} required error={errors.department} />
             <InputField label="Date" value={form.date} onChange={() => {}} type="date" readOnly />
-            <InputField label="Date of Employment" value={form.dateOfEmployment} onChange={setField("dateOfEmployment")} type="date" />
+            <InputField label="Date of Employment" value={form.dateOfEmployment} onChange={setField("dateOfEmployment")} type="date" required error={errors.dateOfEmployment} />
             <div>
-              <label style={labelStyle}>Confirmation Status</label>
-              <SelectInput value={form.confirmationStatus} onChange={setField("confirmationStatus")}>
+              <label style={labelStyle}>Confirmation Status <span style={{ color: "#e11d48" }}>*</span></label>
+              <SelectInput value={form.confirmationStatus} onChange={setField("confirmationStatus")} hasError={!!errors.confirmationStatus}>
                 <option value="">Select status...</option>
                 {CONFIRMATION_OPTIONS.map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </SelectInput>
+              {errors.confirmationStatus && <span style={errorStyle}>{errors.confirmationStatus}</span>}
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Grade / Level <span style={{ color: "#e11d48" }}>*</span></label>
+              <SelectInput value={form.grade || ""} onChange={setField("grade")} hasError={!!errors.grade}>
+                <option value="">Select your grade...</option>
+                {GRADES.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </SelectInput>
+              {errors.grade && <span style={errorStyle}>{errors.grade}</span>}
             </div>
           </div>
 
@@ -202,6 +235,7 @@ export default function LeaveForm() {
                 key={lt.id}
                 label={lt.label}
                 selected={form.leaveTypes.includes(lt.id)}
+                exhausted={isExhausted(lt.id)}
                 onChange={() => selectLeaveType(lt.id)}
               />
             ))}

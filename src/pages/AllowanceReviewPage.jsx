@@ -198,22 +198,6 @@ export default function AllowanceReviewPage() {
           <InfoRow label="Supervisor"   value={leave.supervisorName} />
         </div>
 
-        {/* Action confirmation based on link clicked */}
-        {action && (
-          <div style={{
-            padding: "12px 16px", borderRadius: 10, marginBottom: 20,
-            background: action === "approve" ? "#f0fdf4" : "#fef2f2",
-            border: `1px solid ${action === "approve" ? "#86efac" : "#fca5a5"}`,
-            fontSize: 13, fontWeight: 600,
-            color: action === "approve" ? "#166534" : "#991b1b",
-            fontFamily: "'DM Sans', sans-serif",
-          }}>
-            {action === "approve"
-              ? "✓ You are about to approve this allowance request"
-              : "✗ You are about to reject this allowance request"}
-          </div>
-        )}
-
         {/* Buttons */}
         <div style={{ display: "flex", gap: 12 }}>
           <button

@@ -9,6 +9,9 @@ export function validateLeaveForm(form) {
 
   if (!form.staffName?.trim()) errors.staffName = "Staff name is required";
   if (!form.department?.trim()) errors.department = "Department is required";
+  if (!form.dateOfEmployment) errors.dateOfEmployment = "Date of employment is required";
+  if (!form.confirmationStatus) errors.confirmationStatus = "Confirmation status is required";
+  if (!form.grade) errors.grade = "Grade / Level is required";
 
   // Bug Fix 2 — only one leave type allowed
   if (!form.leaveTypes || form.leaveTypes.length === 0)
