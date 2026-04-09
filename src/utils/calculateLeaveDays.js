@@ -26,6 +26,20 @@ export function calculateLeaveDays(startDate, endDate) {
 }
 
 /**
+ * Returns the next working day (Mon–Fri) after a given date string.
+ * @param {string} dateStr - "YYYY-MM-DD"
+ * @returns {string} - "YYYY-MM-DD"
+ */
+export function getNextWorkingDay(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  do {
+    date.setDate(date.getDate() + 1);
+  } while (date.getDay() === 0 || date.getDay() === 6);
+  return date.toISOString().split("T")[0];
+}
+
+/**
  * Format a Firestore timestamp or date string to readable Nigerian date
  * @param {any} timestamp - Firestore Timestamp or ISO string
  * @returns {string}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { getLeavesByUser } from "../services/sharepointService";
-import { formatDate } from "../utils/calculateLeaveDays";
+import { formatDate, getNextWorkingDay } from "../utils/calculateLeaveDays";
 import { LEAVE_TYPES } from "../constants/leaveTypes";
 import { useLeaveBalance } from "../hooks/useLeaveBalance";
 import Navbar from "../components/layout/Navbar";
@@ -36,7 +36,7 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%)", fontFamily: "'DM Sans', sans-serif" }}>
       <Navbar />
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 16px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 16px" }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1e293b", letterSpacing: "-0.02em", marginBottom: 4 }}>Welcome back, {user?.name?.split(" ")[0]} 👋</h1>
           <p style={{ fontSize: 14, color: "#64748b" }}>Track and manage your leave requests below.</p>
@@ -123,7 +123,7 @@ export default function DashboardPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
-                    {["Leave Type","Start Date","End Date","Days","Supervisor","Status","Submitted"].map(h => (
+                    {["Leave Type","Start Date","End Date","Days","Resumption Date","Supervisor","Status","Submitted"].map(h => (
                       <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -132,9 +132,10 @@ export default function DashboardPage() {
                   {leaves.map((leave) => (
                     <tr key={leave.id} style={{ borderBottom: "1px solid #f8fafc" }}>
                       <td style={{ padding: "14px 20px", fontSize: 13, color: "#1e293b", fontWeight: 600 }}>{leave.leaveTypes?.map(leaveTypeLabel).join(", ")}</td>
-                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569" }}>{leave.startDate}</td>
-                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569" }}>{leave.endDate}</td>
-                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", textAlign: "center" }}>{leave.totalDays}</td>
+                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{leave.startDate?.split("T")[0]}</td>
+                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{leave.endDate?.split("T")[0]}</td>
+                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", textAlign: "center" }}>{leave.adjustedDays || leave.totalDays}</td>
+                      <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>{leave.endDate ? getNextWorkingDay(leave.endDate.split("T")[0]) : "—"}</td>
                       <td style={{ padding: "14px 20px", fontSize: 13, color: "#475569" }}>{leave.supervisorName}</td>
                       <td style={{ padding: "14px 20px" }}><StatusBadge status={leave.status} /></td>
                       <td style={{ padding: "14px 20px", fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{formatDate(leave.submittedAt)}</td>

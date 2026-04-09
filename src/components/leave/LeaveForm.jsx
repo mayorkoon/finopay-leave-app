@@ -49,19 +49,21 @@ function SelectInput({ value, onChange, children, hasError }) {
 }
 
 // ── Leave Type Radio Button ──────────────────────────────────────────────────
-function LeaveTypeOption({ label, selected, onChange, exhausted }) {
-  const disabled = exhausted && !selected;
+function LeaveTypeOption({ label, selected, onChange, exhausted, disabled: disabledProp }) {
+  const disabled = (exhausted && !selected) || disabledProp;
   return (
-    <label style={{
-      display: "flex", alignItems: "center", gap: 10,
-      cursor: disabled ? "not-allowed" : "pointer",
-      padding: "10px 14px", borderRadius: 8,
-      border: `1.5px solid ${exhausted ? "#e2e8f0" : selected ? "#c0392b" : "#e2e8f0"}`,
-      background: exhausted ? "#f8fafc" : selected ? "#fff1f2" : "#fff",
-      transition: "all 0.2s", userSelect: "none",
-      fontFamily: "'DM Sans', sans-serif",
-      opacity: exhausted ? 0.6 : 1,
-    }}>
+    <div
+      onClick={disabled ? undefined : onChange}
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        cursor: disabled ? "not-allowed" : "pointer",
+        padding: "10px 14px", borderRadius: 8,
+        border: `1.5px solid ${selected ? "#c0392b" : "#e2e8f0"}`,
+        background: selected ? "#fff1f2" : disabled ? "#f8fafc" : "#fff",
+        transition: "all 0.2s", userSelect: "none",
+        fontFamily: "'DM Sans', sans-serif",
+        opacity: disabled ? 0.45 : 1,
+      }}>
       <div style={{
         width: 18, height: 18, borderRadius: "50%",
         border: `2px solid ${selected ? "#c0392b" : "#cbd5e1"}`,
@@ -87,20 +89,21 @@ function LeaveTypeOption({ label, selected, onChange, exhausted }) {
           </span>
         )}
       </div>
-      <input type="radio" checked={selected} disabled={disabled} onChange={disabled ? undefined : onChange} style={{ display: "none" }} />
-    </label>
+    </div>
   );
 }
 
 // ── Allowance Toggle ─────────────────────────────────────────────────────────
-function AllowanceToggle({ checked, onChange }) {
+function AllowanceToggle({ checked, onChange, disabled }) {
   return (
     <div style={{
       padding: "16px 20px", borderRadius: 12,
       border: `1.5px solid ${checked ? "#f59e0b" : "#e2e8f0"}`,
       background: checked ? "#fffbeb" : "#f8fafc",
-      transition: "all 0.2s", cursor: "pointer",
-    }} onClick={onChange}>
+      transition: "all 0.2s",
+      cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.5 : 1,
+    }} onClick={disabled ? undefined : onChange}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{
           width: 44, height: 24, borderRadius: 12,
@@ -236,6 +239,7 @@ export default function LeaveForm() {
                 label={lt.label}
                 selected={form.leaveTypes.includes(lt.id)}
                 exhausted={isExhausted(lt.id)}
+                disabled={form.leaveTypes.length > 0 && !form.leaveTypes.includes(lt.id)}
                 onChange={() => selectLeaveType(lt.id)}
               />
             ))}
@@ -246,6 +250,7 @@ export default function LeaveForm() {
               value={form.othersNote}
               onChange={setField("othersNote")}
               placeholder="Describe other leave reason if applicable..."
+              disabled={form.leaveTypes.length > 0}
             />
           </div>
 
@@ -342,7 +347,7 @@ export default function LeaveForm() {
           {/* ── SECTION 4: Leave Allowance ── */}
           <SectionHeader title="Leave Allowance" />
           <div style={{ marginBottom: 32 }}>
-            <AllowanceToggle checked={form.requestAllowance} onChange={toggleAllowance} />
+            <AllowanceToggle checked={form.requestAllowance} onChange={toggleAllowance} disabled={isSubmitting} />
             {form.requestAllowance && (
               <div style={{
                 marginTop: 12, padding: "12px 16px", borderRadius: 10,

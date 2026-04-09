@@ -68,7 +68,7 @@ function mapItem(item) {
     staffEmail:           f.StaffEmail           || "",
     department:           f.Department           || "",
     staffNumber:          f.StaffNumber          || "",
-    confirmationStatus:   f.ConfirmationStatus   || "",
+    confirmationStatus:   f.ConfirmationStatus === "Not confirmed" ? "Not Confirmed" : (f.ConfirmationStatus || ""),
     band:                 f.Band                 || "",
     leaveTypes:           f.LeaveType ? [f.LeaveType] : [],  // stored as label e.g. "Annual Leave"
     startDate:            f.StartDate            || "",
@@ -249,8 +249,13 @@ export async function updateApproval(itemId, decision) {
   };
 
   if (stage === "hr" && approved) {
-    if (resumptionDate) updateFields.ResumptionDate = resumptionDate;
-    if (adjustedDays)   updateFields.AdjustedDays   = parseInt(adjustedDays);
+    if (resumptionDate) {
+      updateFields.ResumptionDate = resumptionDate;
+      const endDay = new Date(resumptionDate);
+      endDay.setDate(endDay.getDate() - 1);
+      updateFields.EndDate = endDay.toISOString().split("T")[0];
+    }
+    if (adjustedDays) updateFields.AdjustedDays = parseInt(adjustedDays);
   }
 
   let approveToken;
@@ -333,6 +338,11 @@ export async function getBandEntitlements() {
         casual: f.CasualLeaveDays || 0,
       };
     });
+    // Fall back to local constants if the SharePoint list is empty
+    if (Object.keys(entitlements).length === 0) {
+      const { BAND_ENTITLEMENTS } = await import("../constants/leaveEntitlements");
+      return BAND_ENTITLEMENTS;
+    }
     return entitlements;
   } catch (err) {
     console.warn("[SharePoint] Entitlements fetch failed, using local fallback:", err);

@@ -6,6 +6,7 @@ export default function InputField({
   type = "text",
   required = false,
   readOnly = false,
+  disabled = false,
   error = "",
 }) {
   return (
@@ -29,6 +30,7 @@ export default function InputField({
         onChange={onChange}
         placeholder={placeholder}
         readOnly={readOnly}
+        disabled={disabled}
         style={{
           padding: "10px 14px",
           borderRadius: 8,
@@ -36,14 +38,15 @@ export default function InputField({
           fontSize: 14,
           fontFamily: "'DM Sans', sans-serif",
           color: "#1e293b",
-          background: readOnly ? "#f8fafc" : "#fff",
+          background: readOnly || disabled ? "#f8fafc" : "#fff",
           outline: "none",
           transition: "border-color 0.2s",
-          cursor: readOnly ? "default" : "text",
+          cursor: readOnly || disabled ? "not-allowed" : "text",
           width: "100%",
+          opacity: disabled ? 0.45 : 1,
         }}
         onFocus={(e) => {
-          if (!readOnly) e.target.style.borderColor = "#c0392b";
+          if (!readOnly && !disabled) e.target.style.borderColor = "#c0392b";
         }}
         onBlur={(e) => {
           e.target.style.borderColor = error ? "#fca5a5" : "#e2e8f0";

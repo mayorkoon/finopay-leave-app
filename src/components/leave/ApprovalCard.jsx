@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { LEAVE_TYPES } from "../../constants/leaveTypes";
-import { formatDate } from "../../utils/calculateLeaveDays";
+import { formatDate, calculateLeaveDays } from "../../utils/calculateLeaveDays";
 
 const leaveLabel = (id) => LEAVE_TYPES.find((l) => l.id === id)?.label || id;
 
@@ -112,6 +112,16 @@ export default function ApprovalCard({ leave, stage, approverName, approverEmail
   // HR-only: adjustable fields
   const [resumptionDate, setResumptionDate]       = useState(leave.resumptionDate || "");
   const [adjustedDays, setAdjustedDays]           = useState(leave.totalDays || "");
+
+  useEffect(() => {
+    if (!resumptionDate || !leave.startDate) return;
+    // Resumption date is the first day back, so last leave day = resumption - 1
+    const lastDay = new Date(resumptionDate);
+    lastDay.setDate(lastDay.getDate() - 1);
+    const lastDayStr = lastDay.toISOString().split("T")[0];
+    const days = calculateLeaveDays(leave.startDate.split("T")[0], lastDayStr);
+    if (days) setAdjustedDays(days);
+  }, [resumptionDate]);
 
   const showToast = (message, type) => setToast({ message, type });
 
