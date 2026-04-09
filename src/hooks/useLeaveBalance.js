@@ -1,18 +1,14 @@
 import { useState, useEffect } from "react";
-import { getLeavesByUser } from "../services/leaveService";
-import { TRACKABLE_LEAVE_TYPES, BAND_ENTITLEMENTS } from "../constants/leaveEntitlements";
+import { getLeavesByUser, getBandEntitlements } from "../services/sharepointService";
+import { TRACKABLE_LEAVE_TYPES } from "../constants/leaveEntitlements";
 
 /**
  * Calculate leave balance for the logged-in staff member.
- *
- * Privacy model:
- * - Raw grade is never stored in Firestore
- * - Grade → Band mapping happens in the browser only (in useLeaveForm)
- * - Only the band is saved to Firestore
- * - This hook receives the band directly from the leave record
+ * Entitlements are fetched from SharePoint Leave Band Entitlements list.
+ * Falls back to local constants if SharePoint is unavailable.
  *
  * @param {object} user           - authenticated user
- * @param {string} band           - e.g. "Band 1" (read from Firestore leave record)
+ * @param {string} band           - e.g. "Band 1" (stored in leave record)
  * @param {string} employmentType - Confirmed | Contract | Not Confirmed
  */
 export function useLeaveBalance(user, band, employmentType) {
@@ -27,8 +23,11 @@ export function useLeaveBalance(user, band, employmentType) {
 
     const currentYear = new Date().getFullYear();
 
-    getLeavesByUser(user.email)
-      .then((leaves) => {
+    Promise.all([
+      getLeavesByUser(user.email),
+      getBandEntitlements(),
+    ])
+      .then(([leaves, entitlements]) => {
         // Only count HR-approved leaves from current year
         const approvedThisYear = leaves.filter((l) => {
           const isApproved = l.status === "approved" ||
@@ -39,7 +38,7 @@ export function useLeaveBalance(user, band, employmentType) {
           return isApproved && leaveYear === currentYear;
         });
 
-        // Calculate days used per trackable leave type
+        // Sum days used per trackable leave type
         const usedDays = { annual: 0, sick: 0, casual: 0 };
         approvedThisYear.forEach((leave) => {
           const leaveTypeId = Array.isArray(leave.leaveTypes)
@@ -52,9 +51,9 @@ export function useLeaveBalance(user, band, employmentType) {
           }
         });
 
-        // Look up entitlement directly by band + employment type
+        // Look up entitlement from SharePoint data
         const ent = band && employmentType
-          ? BAND_ENTITLEMENTS[band]?.[employmentType] || null
+          ? entitlements[band]?.[employmentType] || null
           : null;
 
         setUsed(usedDays);

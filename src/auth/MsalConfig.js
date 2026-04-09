@@ -1,57 +1,63 @@
 import { PublicClientApplication, LogLevel } from "@azure/msal-browser";
 
-// ── Dev Bypass Flag ───────────────────────────────────────
-// Set VITE_USE_MOCK_AUTH=true in .env to skip Microsoft login
-// Remove or set to false when Azure AD credentials are ready
+// ── Dev Bypass Flag ───────────────────────────────────────────────────────────
 export const USE_MOCK_AUTH = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
-/**
- * MSAL Configuration
- * Replace VITE_MSAL_CLIENT_ID and VITE_MSAL_TENANT_ID in your .env file
- *
- * Azure Portal setup steps:
- * 1. Go to Azure Portal → Azure Active Directory → App Registrations
- * 2. Click "New Registration"
- * 3. Name: "Finopay Leave App"
- * 4. Supported account types: "Accounts in this organizational directory only"
- * 5. Redirect URI: Single-page application → http://localhost:5173 (dev)
- *    Add production URL when deploying
- * 6. After creation, copy Application (client) ID and Directory (tenant) ID
- */
+// ── HR & MD Config ────────────────────────────────────────────────────────────
+export const HR_EMAIL = import.meta.env.VITE_HR_EMAIL || "hr@finopay.com";
+export const MD_EMAIL = import.meta.env.VITE_MD_EMAIL || "md@finopay.com";
+
+// ── Azure AD Group IDs ────────────────────────────────────────────────────────
+export const INITIATORS_GROUP_ID = import.meta.env.VITE_INITIATORS_GROUP_ID;
+export const APPROVERS_GROUP_ID  = import.meta.env.VITE_APPROVERS_GROUP_ID;
+
+// ── SharePoint Config ─────────────────────────────────────────────────────────
+export const SP_SITE_ID       = import.meta.env.VITE_SHAREPOINT_SITE_ID;
+export const SP_LEAVE_LIST_ID = import.meta.env.VITE_SHAREPOINT_LEAVE_LIST_ID;
+export const SP_BANDS_LIST_ID = import.meta.env.VITE_SHAREPOINT_BANDS_LIST_ID;
+
+// ── MSAL Configuration ────────────────────────────────────────────────────────
 export const msalConfig = {
   auth: {
-    clientId: import.meta.env.VITE_MSAL_CLIENT_ID || "00000000-0000-0000-0000-000000000000",
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID || "common"}`,
-    redirectUri: window.location.origin,
+    clientId:              import.meta.env.VITE_MSAL_CLIENT_ID || "00000000-0000-0000-0000-000000000000",
+    authority:             `https://login.microsoftonline.com/${import.meta.env.VITE_MSAL_TENANT_ID || "common"}`,
+    redirectUri:           window.location.origin,
     postLogoutRedirectUri: window.location.origin,
   },
   cache: {
-    cacheLocation: "sessionStorage", // Use sessionStorage for security
+    cacheLocation:       "sessionStorage",
     storeAuthStateInCookie: false,
   },
   system: {
     loggerOptions: {
       loggerCallback: (level, message, containsPii) => {
-        if (containsPii) return;
-        if (import.meta.env.DEV) {
-          switch (level) {
-            case LogLevel.Error: console.error(message); break;
-            case LogLevel.Warning: console.warn(message); break;
-            case LogLevel.Info: console.info(message); break;
-          }
-        }
+        if (containsPii || !import.meta.env.DEV) return;
+        if (level === 0) console.error(message);
+        if (level === 1) console.warn(message);
       },
     },
   },
 };
 
-// Scopes for Microsoft Graph (to read user profile)
+// ── Login scopes ──────────────────────────────────────────────────────────────
+// User.Read       — read profile (name, email, department)
+// Sites.ReadWrite.All — read/write SharePoint Lists
+// GroupMember.Read.All — check group memberships for role assignment
 export const loginRequest = {
-  scopes: ["User.Read", "openid", "profile", "email"],
+  scopes: [
+    "User.Read",
+    "Sites.ReadWrite.All",
+    "GroupMember.Read.All",
+  ],
+};
+
+// ── Graph API token request (used for API calls after login) ──────────────────
+export const graphRequest = {
+  scopes: [
+    "https://graph.microsoft.com/User.Read",
+    "https://graph.microsoft.com/Sites.ReadWrite.All",
+    "https://graph.microsoft.com/GroupMember.Read.All",
+  ],
 };
 
 export const msalInstance = new PublicClientApplication(msalConfig);
-
-// ── HR Config ─────────────────────────────────────────────
-// Fixed HR email — all approved requests route here for final approval
-export const HR_EMAIL = import.meta.env.VITE_HR_EMAIL || "hr@finopay.com";
