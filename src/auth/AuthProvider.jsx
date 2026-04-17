@@ -72,6 +72,7 @@ function MsalAuthProvider({ children }) {
   const login  = () => instance.loginRedirect(loginRequest);
   const logout = () => instance.logoutRedirect({
     postLogoutRedirectUri: window.location.origin,
+    onRedirectNavigate: () => false, // clears local MSAL cache only, does not sign out of Microsoft
   });
 
   return (
