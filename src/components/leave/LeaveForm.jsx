@@ -2,7 +2,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { useLeaveForm } from "../../hooks/useLeaveForm";
 import { useLeaveBalance } from "../../hooks/useLeaveBalance";
 import { LEAVE_TYPES } from "../../constants/leaveTypes";
-import { GRADES, TRACKABLE_LEAVE_TYPES } from "../../constants/leaveEntitlements";
+import { GRADES, TRACKABLE_LEAVE_TYPES, getBandForGrade } from "../../constants/leaveEntitlements";
 import InputField from "../ui/InputField";
 import SectionHeader from "../ui/SectionHeader";
 import LeaveSuccess from "./LeaveSuccess";
@@ -145,7 +145,7 @@ export default function LeaveForm() {
     toggleAllowance, submit, reset,
   } = useLeaveForm(user);
 
-  const { balance } = useLeaveBalance(user, form.confirmationStatus, form.grade);
+  const { balance } = useLeaveBalance(user, getBandForGrade(form.grade), form.confirmationStatus);
 
   // Returns true if a leave type's balance is known and exhausted
   const isExhausted = (leaveTypeId) => {

@@ -178,8 +178,6 @@ export async function getLeavesByApprover(approverEmail) {
   const res = await graphGet(`${LEAVE_BASE}?expand=fields`);
 
   const allItems = (res.value || []).map(mapItem);
-  allItems.forEach(i => {
-  });
 
   // Filter client-side by approver email and pending status
   const pending = allItems.filter(i => {

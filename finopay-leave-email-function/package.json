@@ -1,0 +1,16 @@
+{
+  "name": "finopay-leave-email",
+  "version": "1.0.0",
+  "description": "Email proxy function for Finopay HR Leave Management System",
+  "main": "index.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "nodemailer": "^8.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
